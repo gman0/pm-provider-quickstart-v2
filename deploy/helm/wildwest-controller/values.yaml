@@ -1,0 +1,73 @@
+replicaCount: 1
+
+image:
+  repository: ghcr.io/platform-mesh/provider-quickstart
+  pullPolicy: IfNotPresent
+  tag: "@sha256:a876bef6e9dcaf4e9b36915aa4ef80ef5c44a4fdffda4e988d5c7a5d15d27c7b"
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  automount: true
+  annotations: {}
+  name: ""
+
+podAnnotations: {}
+podLabels: {}
+
+podSecurityContext: {}
+
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  runAsUser: 65532
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 256Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+# Controller configuration
+controller:
+  endpointSlice: "wildwest.platform-mesh.io"
+
+# kcp kubeconfig secret
+kubeconfig:
+  secretName: "wildwest-controller-kubeconfig"
+  secretKey: "kubeconfig"
+
+# Optional init container that runs the bootstrap binary before the controller
+# starts. Expects a separate secret holding an admin kubeconfig pointed at the
+# provider workspace (or at the parent workspace if seedWorkspaces is true).
+init:
+  enabled: false
+  kubeconfig:
+    secretName: ""
+    secretKey: "kubeconfig"
+  # Override the server URL written into the controller kubeconfig the init
+  # binary generates (e.g. https://frontproxy-front-proxy.platform-mesh-system:6443).
+  hostOverride: ""
+  # When true the init binary also creates the workspace hierarchy from
+  # workspaces[] under parentWorkspace before bootstrapping content.
+  seedWorkspaces: false
+  parentWorkspace: "root"
+  workspaces:
+    - "providers=root:providers"
+    - "quickstart=root:provider"
+  resources: {}
