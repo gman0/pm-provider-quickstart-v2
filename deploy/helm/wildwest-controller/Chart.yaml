@@ -10,3 +10,6 @@ dependencies:
   - name: common
     version: 0.16.0
     repository: oci://ghcr.io/platform-mesh/helm-charts
+  - name: wildwest-crds
+    version: 0.0.3
+    repository: file://../wildwest-crds

@@ -1,0 +1,8 @@
+apiVersion: v2
+name: wildwest-crds
+description: Wild West CRDs — installed as regular templates so they participate in Helm release lifecycle.
+type: application
+version: 0.0.3
+appVersion: "0.0.0-dev"
+sources:
+  - https://github.com/platform-mesh/provider-quickstart

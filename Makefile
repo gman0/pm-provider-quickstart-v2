@@ -26,12 +26,6 @@ CONTROLLER_GEN_BIN := controller-gen
 CONTROLLER_GEN := $(GOBIN_DIR)/$(CONTROLLER_GEN_BIN)-$(CONTROLLER_GEN_VER)
 export CONTROLLER_GEN
 
-# apigen - generates APIResourceSchemas from CRDs
-APIGEN_VER := v0.28.1-0.20251209130449-436a0347809b
-APIGEN_BIN := apigen
-APIGEN := $(GOBIN_DIR)/$(APIGEN_BIN)-$(APIGEN_VER)
-export APIGEN
-
 # Go parameters
 GOCMD = go
 GOBUILD = $(GOCMD) build
@@ -48,9 +42,19 @@ BUILD_DIR = bin
 
 # Image parameters
 IMAGE_REGISTRY ?= ghcr.io/platform-mesh
-IMAGE_NAME ?= provider-quickstart
+IMAGE_NAME ?= provider-quickstart-v2
 IMAGE_TAG ?= dev
 IMAGE ?= $(IMAGE_REGISTRY)/$(IMAGE_NAME):$(IMAGE_TAG)
+
+CONTAINER_TOOL ?= $(shell command -v docker >/dev/null 2>&1 && echo docker || (command -v podman >/dev/null 2>&1 && echo podman))
+ifeq ($(CONTAINER_TOOL),)
+$(error Neither docker nor podman found in PATH; install one or set CONTAINER_TOOL explicitly)
+endif
+ifeq ($(CONTAINER_TOOL),podman)
+IMAGE_PUSH_FLAGS ?= --tls-verify=false
+else
+IMAGE_PUSH_FLAGS ?=
+endif
 
 # Portal image parameters
 PORTAL_IMAGE_NAME ?= provider-quickstart-portal
@@ -77,11 +81,11 @@ build-bootstrapper: fmt vet
 ## run: Run the wild-west operator locally
 .PHONY: run
 run: fmt vet
-	$(GORUN) ./cmd/wild-west/main.go --endpointslice=wildwest.platform-mesh.io
+	$(GORUN) ./cmd/wild-west/main.go
 
-## generate: Generate code (deepcopy, etc.) and kcp resources
+## generate: Generate code (deepcopy, etc.) and sync CRDs into the helm chart
 .PHONY: generate
-generate: $(CONTROLLER_GEN) manifests apiresourceschemas
+generate: $(CONTROLLER_GEN) manifests sync-crd-chart
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./apis/..."
 
 ## manifests: Generate CRD manifests
@@ -89,10 +93,15 @@ generate: $(CONTROLLER_GEN) manifests apiresourceschemas
 manifests: $(CONTROLLER_GEN)
 	$(CONTROLLER_GEN) crd paths="./apis/..." output:crd:artifacts:config=config/crds
 
-## apiresourceschemas: Generate APIResourceSchemas from CRDs
-.PHONY: apiresourceschemas
-apiresourceschemas: manifests $(APIGEN)
-	$(APIGEN) --input-dir=config/crds --output-dir=config/kcp --preserve-resources
+# Mirror generated CRDs into the wildwest-crds helm chart's templates dir.
+# Replaces any previously synced CRD files so renames and removals propagate.
+CRD_CHART_DIR = deploy/helm/wildwest-crds
+.PHONY: sync-crd-chart
+sync-crd-chart: manifests
+	@mkdir -p $(CRD_CHART_DIR)/templates
+	@rm -f $(CRD_CHART_DIR)/templates/*.yaml
+	@cp config/crds/*.yaml $(CRD_CHART_DIR)/templates/
+	@echo "==> synced CRDs to $(CRD_CHART_DIR)/templates/"
 
 ## fmt: Run go fmt
 .PHONY: fmt
@@ -112,22 +121,22 @@ tidy:
 ## image-build: Build controller container image locally
 .PHONY: image-build
 image-build:
-	docker build -t $(IMAGE) -f deploy/Dockerfile .
+	$(CONTAINER_TOOL) build -t $(IMAGE) -f deploy/Dockerfile .
 
 ## image-push: Push controller container image to registry
 .PHONY: image-push
 image-push: image-build
-	docker push $(IMAGE)
+	$(CONTAINER_TOOL) push $(IMAGE_PUSH_FLAGS) $(IMAGE)
 
 ## portal-image-build: Build portal container image locally
 .PHONY: portal-image-build
 portal-image-build:
-	docker build -t $(PORTAL_IMAGE) -f deploy/portal.Dockerfile .
+	$(CONTAINER_TOOL) build -t $(PORTAL_IMAGE) -f deploy/portal.Dockerfile .
 
 ## portal-image-push: Push portal container image to registry
 .PHONY: portal-image-push
 portal-image-push: portal-image-build
-	docker push $(PORTAL_IMAGE)
+	$(CONTAINER_TOOL) push $(IMAGE_PUSH_FLAGS) $(PORTAL_IMAGE)
 
 ## images: Build all container images
 .PHONY: images
@@ -140,15 +149,25 @@ images-push: image-push portal-image-push
 # Kind cluster parameters
 KIND_CLUSTER ?= platform-mesh
 
+# kind's `load docker-image` only works with docker. For podman we save the
+# image to a tarball and pipe it through `kind load image-archive`.
+define kind_load_image
+	$(if $(filter podman,$(CONTAINER_TOOL)), \
+	  tmp=$$(mktemp -t kind-img.XXXXXX.tar) && trap 'rm -f $$tmp' EXIT && \
+	  $(CONTAINER_TOOL) save -o $$tmp $(1) && \
+	  kind load image-archive $$tmp --name $(KIND_CLUSTER), \
+	  kind load docker-image $(1) --name $(KIND_CLUSTER))
+endef
+
 ## kind-load: Load controller image into kind cluster
 .PHONY: kind-load
 kind-load: image-build
-	kind load docker-image $(IMAGE) --name $(KIND_CLUSTER)
+	$(call kind_load_image,$(IMAGE))
 
 ## kind-load-portal: Load portal image into kind cluster
 .PHONY: kind-load-portal
 kind-load-portal: portal-image-build
-	kind load docker-image $(PORTAL_IMAGE) --name $(KIND_CLUSTER)
+	$(call kind_load_image,$(PORTAL_IMAGE))
 
 ## kind-load-all: Load all images into kind cluster
 .PHONY: kind-load-all
@@ -157,23 +176,23 @@ kind-load-all: kind-load kind-load-portal
 ## portal-run: Run portal container locally (accessible at http://localhost:$(PORTAL_PORT))
 .PHONY: portal-run
 portal-run:
-	docker run --rm -p $(PORTAL_PORT):8080 $(PORTAL_IMAGE)
+	$(CONTAINER_TOOL) run --rm -p $(PORTAL_PORT):8080 $(PORTAL_IMAGE)
 
 ## portal-run-detached: Run portal container in background
 .PHONY: portal-run-detached
 portal-run-detached:
-	docker run -d --rm --name wildwest-portal -p $(PORTAL_PORT):80 $(PORTAL_IMAGE)
+	$(CONTAINER_TOOL) run -d --rm --name wildwest-portal -p $(PORTAL_PORT):80 $(PORTAL_IMAGE)
 	@echo "Portal running at http://localhost:$(PORTAL_PORT)"
-	@echo "Stop with: docker stop wildwest-portal"
+	@echo "Stop with: $(CONTAINER_TOOL) stop wildwest-portal"
 
 ## portal-stop: Stop the portal container
 .PHONY: portal-stop
 portal-stop:
-	docker stop wildwest-portal
+	$(CONTAINER_TOOL) stop wildwest-portal
 
 ## tools: Install all required tools
 .PHONY: tools
-tools: $(CONTROLLER_GEN) $(APIGEN)
+tools: $(CONTROLLER_GEN)
 
 VERSION ?= 0.0.0-dev
 CHART_VERSION ?= $(VERSION)
@@ -182,7 +201,7 @@ IMAGE_VERSION ?= $(VERSION)
 # Helm chart publishing parameters
 HELM ?= helm
 HELM_REPO ?= ghcr.io/platform-mesh/provider-quickstart/charts
-HELM_CHARTS ?= wildwest-controller wildwest-portal wildwest-bootstrapper
+HELM_CHARTS ?= wildwest-crds wildwest-controller wildwest-portal wildwest-bootstrapper
 
 ## helm-push: Package and push deployable Helm charts to $(HELM_REPO) as OCI artifacts
 .PHONY: helm-push
@@ -208,6 +227,3 @@ help:
 # Tool installation targets
 $(CONTROLLER_GEN):
 	GOBIN=$(GOBIN_DIR) $(GO_INSTALL) sigs.k8s.io/controller-tools/cmd/$(CONTROLLER_GEN_BIN) $(CONTROLLER_GEN_BIN) $(CONTROLLER_GEN_VER)
-
-$(APIGEN):
-	GOBIN=$(GOBIN_DIR) $(GO_INSTALL) github.com/kcp-dev/sdk/cmd/$(APIGEN_BIN) $(APIGEN_BIN) $(APIGEN_VER)

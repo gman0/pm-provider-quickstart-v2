@@ -1,5 +1,5 @@
 /*
-Copyright 2025 The Platform Mesh Authors.
+Copyright The Platform Mesh Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -31,60 +31,44 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
-	mcmanager "sigs.k8s.io/multicluster-runtime/pkg/manager"
-
-	apisv1alpha1 "github.com/kcp-dev/sdk/apis/apis/v1alpha1"
-	corev1alpha1 "github.com/kcp-dev/sdk/apis/core/v1alpha1"
-	tenancyv1alpha1 "github.com/kcp-dev/sdk/apis/tenancy/v1alpha1"
-
-	"github.com/kcp-dev/multicluster-provider/apiexport"
-
 	wildwestv1alpha1 "github.com/gman0/provider-quickstart-v2/apis/wildwest/v1alpha1"
 	wildwest "github.com/gman0/provider-quickstart-v2/operator/wild-west"
 )
 
 func init() {
-	runtime.Must(corev1alpha1.AddToScheme(scheme.Scheme))
-	runtime.Must(tenancyv1alpha1.AddToScheme(scheme.Scheme))
-	runtime.Must(apisv1alpha1.AddToScheme(scheme.Scheme))
 	runtime.Must(wildwestv1alpha1.AddToScheme(scheme.Scheme))
 }
 
 func main() {
 	log.SetLogger(zap.New(zap.UseDevMode(true)))
 
+	var (
+		metricsAddr          string
+		probeAddr            string
+		enableLeaderElection bool
+		leaderElectionID     string
+		leaderElectionNS     string
+	)
+	pflag.StringVar(&metricsAddr, "metrics-bind-address", ":9080", "Address the metric endpoint binds to.")
+	pflag.StringVar(&probeAddr, "health-probe-bind-address", ":8080", "Address the probe endpoint binds to.")
+	pflag.BoolVar(&enableLeaderElection, "leader-elect", false, "Enable leader election to ensure only one active controller instance.")
+	pflag.StringVar(&leaderElectionID, "leader-election-id", "wild-west-operator", "Leader election resource lock name.")
+	pflag.StringVar(&leaderElectionNS, "leader-election-namespace", "", "Namespace for the leader election lease.")
+	pflag.Parse()
+
 	ctx := signals.SetupSignalHandler()
 	entryLog := log.Log.WithName("entrypoint")
 
-	var (
-		endpointSlice string
-		provider      *apiexport.Provider
-	)
-
-	pflag.StringVar(&endpointSlice, "endpointslice", "wildwest.platform-mesh.io", "Set the APIExportEndpointSlice name to watch")
-	pflag.Parse()
-
-	cfg := ctrl.GetConfigOrDie()
-
-	// Setup a Manager, note that this not yet engages clusters, only makes them available.
-	entryLog.Info("Setting up manager")
-	opts := manager.Options{
-		HealthProbeBindAddress: ":8080",
-		Metrics: metricsserver.Options{
-			BindAddress: ":9080",
-		},
-	}
-
-	var err error
-	provider, err = apiexport.New(cfg, endpointSlice, apiexport.Options{})
+	mgr, err := manager.New(ctrl.GetConfigOrDie(), manager.Options{
+		Scheme:                  scheme.Scheme,
+		HealthProbeBindAddress:  probeAddr,
+		Metrics:                 metricsserver.Options{BindAddress: metricsAddr},
+		LeaderElection:          enableLeaderElection,
+		LeaderElectionID:        leaderElectionID,
+		LeaderElectionNamespace: leaderElectionNS,
+	})
 	if err != nil {
-		entryLog.Error(err, "unable to construct cluster provider")
-		os.Exit(1)
-	}
-
-	mgr, err := mcmanager.New(cfg, provider, opts)
-	if err != nil {
-		entryLog.Error(err, "unable to set up overall controller manager")
+		entryLog.Error(err, "unable to set up manager")
 		os.Exit(1)
 	}
 
@@ -97,9 +81,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Setup Cowboy controller
-	cowboyReconciler := &wildwest.CowboyReconciler{}
-	if err := cowboyReconciler.SetupWithManager(mgr); err != nil {
+	if err := (&wildwest.CowboyReconciler{}).SetupWithManager(mgr); err != nil {
 		entryLog.Error(err, "failed to setup cowboy controller")
 		os.Exit(1)
 	}

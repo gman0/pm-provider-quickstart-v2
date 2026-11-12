@@ -1,0 +1,2 @@
+# The CRDs under templates/ are copied verbatim from config/crds by
+# `make generate`. No values are currently exposed.
