@@ -1,5 +1,10 @@
 replicaCount: 1
 
+# External URL the portal is reachable at. Informational — consumed by
+# whoever wires this value into a ContentConfiguration or similar.
+# Derived from gateway.hostname + gateway.port by default.
+externalURL: "https://wildwest.127-0-0-1.sslip.io:32000"
+
 image:
   repository: ghcr.io/platform-mesh/provider-quickstart-portal
   pullPolicy: IfNotPresent
@@ -33,47 +38,24 @@ service:
   type: ClusterIP
   port: 8080
 
-ingress:
-  enabled: false
-  className: ""
-  annotations: {}
-  hosts:
-    - host: portal.local
-      paths:
-        - path: /
-          pathType: Prefix
-  tls: []
+# A dedicated Gateway (+ HTTPRoute) terminating TLS for the portal.
+# The gateway controller (whichever implements gateway.className) must publish
+# the listener on the provider cluster so port is reachable externally — on a
+# kind setup that typically means configuring the controller's backing Service
+# as a NodePort bound to .gateway.port.
+gateway:
+  enabled: true
+  className: envoy
+  hostname: wildwest.127-0-0-1.sslip.io
+  port: 32000
 
-httpRoute:
-  enabled: false
-  namespace: platform-mesh-system
-  hostnames:
-    - portal.localhost
-    - "*.portal.localhost"
-  parentRefs:
-    - group: gateway.networking.k8s.io
-      kind: Gateway
-      name: k8sapi-gateway
-      namespace: platform-mesh-system
-  pathPrefix: /cowboys
-  filters:
-    - extensionRef:
-        group: traefik.io
-        kind: Middleware
-        name: wildwest-portal-cors
-      type: ExtensionRef
-  referenceGrant:
-    enabled: true
-    fromNamespace: platform-mesh-system
-
-middleware:
-  enabled: false
-  namespace: platform-mesh-system
-  corsOrigins:
-    - http://localhost:4200
-    - http://*.localhost:4200
-    - https://portal.localhost:8443
-    - https://*.portal.localhost:8443
+# Static TLS material lives under ./pki (committed in-repo). The Secret is
+# synthesized from those files at render time. Set createSecret=false to
+# bring your own externally managed Secret.
+tls:
+  createSecret: true
+  # Leave empty to default to "<fullname>-tls".
+  secretName: ""
 
 resources:
   limits:

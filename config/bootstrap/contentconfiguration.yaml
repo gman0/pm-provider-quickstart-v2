@@ -3,7 +3,7 @@ kind: ContentConfiguration
 metadata:
   labels:
     ui.platform-mesh.io/entity: core_platform-mesh_io_account
-    ui.platform-mesh.io/content-for: wildwest.platform-mesh.io
+    ui.platform-mesh.io/content-for: cowboys.wildwest.dev
   name: cowboys-ui
 spec:
   inlineConfiguration:
