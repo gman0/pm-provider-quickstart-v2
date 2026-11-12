@@ -181,12 +181,6 @@ spec:
 ' | kubectl apply -f -
 ```
 
-Build api-syncagent-deployer
-
-```
-sh -c 'cd ~/ws/kcp-api-syncagent-deployer && make fullbuild'
-```
-
 (provider) Deploy flux
 
 ```
@@ -201,16 +195,23 @@ helm upgrade --install flux oci://ghcr.io/fluxcd-community/charts/flux2 \
   --set imageReflectionController.create=false
 ```
 
+
+Build api-syncagent-deployer
+
+```
+sh -c 'cd ~/ws/kcp-api-syncagent-deployer && make fullbuild'
+```
+
 (provider) Deploy api-syncagent-deployer
 
 ```
 helm \
   upgrade --install -n wildwest --create-namespace \
-  apisyncagent-deployer ~/ws/kcp-api-syncagent-deployer/charts/kcp-api-syncagent-deployer \
-  --set image.repository=localhost:5001/kcp-api-syncagent-deployer \
+  api-syncagent-deployer ~/ws/kcp-api-syncagent-deployer/charts/api-syncagent-deployer \
+  --set image.repository=localhost:5001/api-syncagent-deployer \
   --set image.tag=latest \
   --set image.pullPolicy=Always \
-  --set apiExportEndpointSliceName=wildwest \
+  --set apiExportEndpointSliceName=cowboys.wildwest.dev \
   --set secretLabelSelector=access-sdk.platform-mesh.io/kubeconfig=true
 ```
 
@@ -222,11 +223,12 @@ make image-push IMAGE_REGISTRY=localhost:5001 IMAGE_TAG=latest
 
 ```
 helm \
-  install -n wildwest --create-namespace \
+  upgrade --install -n wildwest --create-namespace \
   wildwest-bootstrapper ./deploy/helm/wildwest-bootstrapper \
-  --set image.repository=localhost:5001/provider-quickstart \
+  --set image.repository=localhost:5001/provider-quickstart-v2 \
   --set image.tag=latest \
   --set image.pullPolicy=Always \
+  --set secretLabelSelector=access-sdk.platform-mesh.io/kubeconfig=true
 
 
 helm \
