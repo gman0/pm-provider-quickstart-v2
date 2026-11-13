@@ -3,7 +3,7 @@ fullnameOverride: ""
 
 # Optional label selector; only Secrets matching it will be reconciled.
 # Empty string means all Secrets are reconciled.
-# Example: "wildwest.platform-mesh.io/bootstrap=true"
+# Example: "wildwest.dev/bootstrap=true"
 secretLabelSelector: ""
 
 # Key in the Secret data that holds the kubeconfig to bootstrap into.

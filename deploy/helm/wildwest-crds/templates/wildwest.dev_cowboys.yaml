@@ -4,9 +4,9 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.16.5
-  name: cowboys.wildwest.platform-mesh.io
+  name: cowboys.wildwest.dev
 spec:
-  group: wildwest.platform-mesh.io
+  group: wildwest.dev
   names:
     kind: Cowboy
     listKind: CowboyList

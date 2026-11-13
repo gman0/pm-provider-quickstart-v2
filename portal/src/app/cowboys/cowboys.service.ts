@@ -11,7 +11,7 @@
  *
  * The GraphQL schema is auto-generated from your Kubernetes CRDs.
  * Query structure follows: {apiGroup}_{version}_{Kind}
- * Example: wildwest_platform_mesh_io.v1alpha1.Cowboys
+ * Example: wildwest_dev.v1alpha1.Cowboys
  */
 import { Injectable, inject } from '@angular/core';
 import { LuigiContextService } from '@luigi-project/client-support-angular';
@@ -37,7 +37,7 @@ export interface Cowboy {
 }
 
 export interface CowboyListResponse {
-  wildwest_platform_mesh_io: {
+  wildwest_dev: {
     v1alpha1: {
       Cowboys: {
         items: Cowboy[];
@@ -48,7 +48,7 @@ export interface CowboyListResponse {
 
 const LIST_COWBOYS_QUERY = `
   query ListCowboys {
-    wildwest_platform_mesh_io {
+    wildwest_dev {
       v1alpha1 {
         Cowboys {
           items {
@@ -87,7 +87,7 @@ const GET_SECRET_QUERY = `
 
 const CREATE_COWBOY_MUTATION = `
   mutation CreateCowboy($name: String!, $intent: String) {
-    wildwest_platform_mesh_io {
+    wildwest_dev {
       v1alpha1 {
         createCowboy(
           object: {
@@ -106,7 +106,7 @@ const CREATE_COWBOY_MUTATION = `
 
 const DELETE_COWBOY_MUTATION = `
   mutation DeleteCowboy($name: String!) {
-    wildwest_platform_mesh_io {
+    wildwest_dev {
       v1alpha1 {
         deleteCowboy(name: $name)
       }
@@ -190,7 +190,7 @@ export class CowboysService {
         )
       ),
       map((response: { data: CowboyListResponse }) => {
-        return response.data?.wildwest_platform_mesh_io?.v1alpha1?.Cowboys?.items || [];
+        return response.data?.wildwest_dev?.v1alpha1?.Cowboys?.items || [];
       }),
       catchError((error) => {
         console.error('Error fetching cowboys:', error);
@@ -218,7 +218,7 @@ export class CowboysService {
         )
       ),
       map((response: any) => {
-        return !!response.data?.wildwest_platform_mesh_io?.v1alpha1?.createCowboy;
+        return !!response.data?.wildwest_dev?.v1alpha1?.createCowboy;
       }),
       catchError((error) => {
         console.error('Error creating cowboy:', error);
@@ -270,7 +270,7 @@ export class CowboysService {
         )
       ),
       map((response: any) => {
-        return !!response.data?.wildwest_platform_mesh_io?.v1alpha1?.deleteCowboy;
+        return !!response.data?.wildwest_dev?.v1alpha1?.deleteCowboy;
       }),
       catchError((error) => {
         console.error('Error deleting cowboy:', error);

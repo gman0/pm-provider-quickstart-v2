@@ -2,5 +2,8 @@ dependencies:
 - name: common
   repository: oci://ghcr.io/platform-mesh/helm-charts
   version: 0.16.0
-digest: sha256:c7bbbe7ebb7a9c385676ad3f1e6c48293d8b8eb7d78a4c148345f8a3a3320c3d
-generated: "2026-10-18T00:22:14.533930019Z"
+- name: wildwest-crds
+  repository: file://../wildwest-crds
+  version: 0.0.3
+digest: sha256:ac6fb0f14165635224c6b819f94c5a8a109e657200d00c5a4871f690c800321c
+generated: "2026-11-13T10:56:30.208246385+01:00"

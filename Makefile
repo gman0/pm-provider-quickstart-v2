@@ -57,7 +57,7 @@ IMAGE_PUSH_FLAGS ?=
 endif
 
 # Portal image parameters
-PORTAL_IMAGE_NAME ?= provider-quickstart-portal
+PORTAL_IMAGE_NAME ?= provider-quickstart-v2-portal
 PORTAL_IMAGE ?= $(IMAGE_REGISTRY)/$(PORTAL_IMAGE_NAME):$(IMAGE_TAG)
 PORTAL_PORT ?= 4200
 

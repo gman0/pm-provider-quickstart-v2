@@ -68,7 +68,7 @@ The Platform Mesh CRD Gateway exposes your Kubernetes resources via GraphQL. The
 # Query pattern: {apiGroup}_{version}_{Kind}s
 # Cowboy is cluster-scoped, so no namespace field on metadata.
 query ListCowboys {
-  wildwest_platform_mesh_io {
+  wildwest_dev {
     v1alpha1 {
       Cowboys {
         items {
@@ -83,7 +83,7 @@ query ListCowboys {
 
 # Mutation pattern (cluster-scoped): create{Kind}(object)
 mutation CreateCowboy($name: String!) {
-  wildwest_platform_mesh_io {
+  wildwest_dev {
     v1alpha1 {
       createCowboy(object: { metadata: { name: $name } }) {
         metadata { name }
@@ -102,7 +102,7 @@ apiVersion: ui.platform-mesh.io/v1alpha1
 kind: ContentConfiguration
 metadata:
   labels:
-    ui.platform-mesh.io/content-for: wildwest.platform-mesh.io  # Links to your APIExport
+    ui.platform-mesh.io/content-for: wildwest.dev  # Links to your APIExport
   name: cowboys-ui
 spec:
   inlineConfiguration:
@@ -223,7 +223,7 @@ For production, you need to:
    kind: ContentConfiguration
    metadata:
      labels:
-       ui.platform-mesh.io/content-for: wildwest.platform-mesh.io
+       ui.platform-mesh.io/content-for: wildwest.dev
      name: cowboys-ui
    spec:
      inlineConfiguration:

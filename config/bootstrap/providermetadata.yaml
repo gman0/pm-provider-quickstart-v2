@@ -1,7 +1,7 @@
 apiVersion: ui.platform-mesh.io/v1alpha1
 kind: ProviderMetadata
 metadata:
-  name: wildwest.platform-mesh.io
+  name: cowboys.wildwest.dev
 spec:
   displayName: Wild West Provider
   description: |
@@ -9,7 +9,7 @@ spec:
     Provides Cowboys API for the Wild West.
   contacts:
   - displayName: Wild West Team
-    email: wildwest@platform-mesh.io
+    email: team@wildwest.dev
     role: ["Maintainer"]
   preferredSupportChannels:
   - displayName: Wild West Support

@@ -6,7 +6,7 @@ rules:
   - apiGroups: ["apis.kcp.io"]
     resources: ["apiexports"]
     verbs: ["bind"]
-    resourceNames: ["wildwest.platform-mesh.io"]
+    resourceNames: ["cowboys.wildwest.dev"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding

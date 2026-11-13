@@ -4,7 +4,7 @@
 kubectl kcp bind apiexport root:platform-mesh-system:providers.platform-mesh.io --accept-all-permission-claims
 ```
 
-Create the provider cluster:
+Setup the provider cluster:
 
 ```
 echo '
@@ -20,9 +20,100 @@ nodes:
 '  | kind-with-registry.sh wildwest-provider
 kind get kubeconfig -n wildwest-provider > kubeconfig
 set KUBECONFIG ./kubeconfig
+
+# cert-manager
+helm install \
+  cert-manager oci://quay.io/jetstack/charts/cert-manager \
+  --namespace cert-manager \
+  --create-namespace \
+  --set crds.enabled=true
+
+# Network setup
+
+helm install eg oci://docker.io/envoyproxy/gateway-helm \
+  --version v1.10.0 -n envoy-gateway-system --create-namespace
+
+NODE_IP=(podman inspect wildwest-provider-control-plane --format '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}') \
+echo "
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: shared-gateway-tls
+  namespace: envoy-gateway-system
+spec:
+  secretName: shared-gateway-tls
+  issuerRef:
+    name: selfsigned-cluster-issuer
+    kind: ClusterIssuer
+    group: cert-manager.io
+  ipAddresses:
+  - 127.0.0.1
+  - $NODE_IP
+  dnsNames:
+  - localhost
+  - wildwest.127-0-0-1.sslip.io
+" | kubectl apply -f -
+
+echo '
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: EnvoyProxy
+metadata:
+  name: shared-nodeport
+  namespace: envoy-gateway-system
+spec:
+  provider:
+    type: Kubernetes
+    kubernetes:
+      envoyService:
+        type: NodePort
+        patch:
+          type: StrategicMerge
+          value:
+            spec:
+              ports:
+                - name: https-443
+                  port: 443
+                  nodePort: 32000
+' | kubectl apply -f -
+
+echo '
+apiVersion: gateway.networking.k8s.io/v1
+kind: GatewayClass
+metadata:
+  name: eg
+spec:
+  controllerName: gateway.envoyproxy.io/gatewayclass-controller
+' | kubectl apply -f -
+
+echo '
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: shared
+  namespace: envoy-gateway-system
+spec:
+  gatewayClassName: eg
+  infrastructure:
+    parametersRef:
+      group: gateway.envoyproxy.io
+      kind: EnvoyProxy
+      name: shared-nodeport
+  listeners:
+    - name: https
+      protocol: HTTPS
+      port: 443
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - { group: "", kind: Secret, name: shared-gateway-tls }
+      allowedRoutes:
+        namespaces:
+          from: All
+' | kubectl apply -f -
+
 ```
 
-(provider) coredns setup:
+(provider) coredns setup; need to get PM's node IP:
 
 ```yaml
   Corefile: |
@@ -40,7 +131,7 @@ set KUBECONFIG ./kubeconfig
         prometheus :9153
         template IN A pm.127-0-0-1.sslip.io {
            match (^|\.)pm\.127-0-0-1\.sslip\.io\.$
-           answer "{{ .Name }} 30 IN A 10.89.0.32"
+           answer "{{ .Name }} 30 IN A 10.89.0.34"
            fallthrough
         }
         forward . /etc/resolv.conf {
@@ -54,16 +145,6 @@ set KUBECONFIG ./kubeconfig
         reload
         loadbalance
     }
-```
-
-Deploy cert-manager:
-
-```
-helm install \
-  cert-manager oci://quay.io/jetstack/charts/cert-manager \
-  --namespace cert-manager \
-  --create-namespace \
-  --set crds.enabled=true
 ```
 
 Build pm-access:
@@ -90,7 +171,7 @@ Deploy pm-access:
 ```
 NODE_IP=(podman inspect wildwest-provider-control-plane --format '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}') \
 helm upgrade --install platform-mesh-access-sdk ~/ws/platform-mesh/charts/platform-mesh-access-sdk \
-                                   --namespace wildwest \
+                                   --namespace wildwest --create-namespace \
                                    --set image.registry=localhost:5001 \
                                    --set image.repository=platform-mesh-access \
                                    --set image.tag=latest \
@@ -127,7 +208,7 @@ kubectl get secret bob-access-token -o json | jq .data.accessToken -r | base64 -
 
 ```
 kubectl create secret generic wildwest-token \
-  --from-literal accessToken=pma1.aHR0cHM6Ly8xMC44OS4wLjMzOjMyMDAw.-jsquSTI7j8GQdoU_kNjkQ.TDxDwzES81ztNQ4lHddgRQOMjfTnwo7rw3o2sTkLnSI
+  --from-literal accessToken=pma1.aHR0cHM6Ly8xMC44OS4wLjM1OjMyMDAw.VKbTgTHT9_qfgxQtvlWN1g.CZglD0T81A1dX31p3sLZQvscTqBuIQ3HdB7z6UNxy0I
 ```
 
 (provider cluster) get the CA bundle:
@@ -145,24 +226,23 @@ spec:
   remote:
     caBundle: |
       -----BEGIN CERTIFICATE-----
-      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
+      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
-      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
+      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
       -----END CERTIFICATE-----
-
 ' | kubectl apply -f -
 ```
 
@@ -230,15 +310,23 @@ helm \
   --set image.pullPolicy=Always \
   --set secretLabelSelector=access-sdk.platform-mesh.io/kubeconfig=true
 
-
 helm \
-  install -n wildwest --create-namespace \
+  upgrade --install -n wildwest --create-namespace \
   wildwest-controller ./deploy/helm/wildwest-controller \
-  --set init.enabled=true \
-  --set init.kubeconfig.secretName=bob-hcq1dw-kubeconfig \
-  --set kubeconfig.secretName=bob-hcq1dw-kubeconfig
+  --set image.repository=localhost:5001/provider-quickstart-v2 \
+  --set image.tag=latest \
+  --set image.pullPolicy=Always
 
 helm \
   install -n wildwest --create-namespace \
-  wildwest-portal ./deploy/helm/wildwest-portal
+  wildwest-portal ./deploy/helm/wildwest-portal \
+  --set image.repository=localhost:5001/provider-quickstart-v2-portal \
+  --set image.tag=latest \
+  --set image.pullPolicy=Always
+```
+
+---
+
+```
+kubectl -s 'https://kcp.api.pm.127-0-0-1.sslip.io:31000/services/marketplace/clusters/24735is03e2i0dvd' get marketplaceentries -o yaml
 ```

@@ -1,0 +1,27 @@
+# Template PublishedResource for the Cowboy CRD.
+#
+# This lives on the provider cluster. It is NOT reconciled by any deployed
+# api-syncagent instance directly — the `apisyncagent.platform-mesh.io/template`
+# label keeps it out of every agent's publishedResourceSelector. The
+# api-syncagent-deployer watches templates and fans each one out into
+# per-agent copies (one per kubeconfig Secret), stamping
+# `syncagent.kcp.io/agent-name=<agent>` so exactly one agent reconciles each
+# copy.
+apiVersion: syncagent.kcp.io/v1alpha1
+kind: PublishedResource
+metadata:
+  name: cowboys
+  labels:
+    apisyncagent.platform-mesh.io/template: "true"
+spec:
+  resource:
+    kind: Cowboy
+    apiGroup: wildwest.dev
+    versions:
+      - v1alpha1
+  # Cowboys are cluster-scoped in kcp. Two different kcp instances could
+  # have a Cowboy of the same name; without a rewrite they'd collide on the
+  # provider cluster. Prefix the destination name with the source kcp's
+  # cluster ID so each kcp's objects land under a distinct namespace.
+  naming:
+    name: "{{ .ClusterName }}-{{ .Object.metadata.name | sha3short }}"
