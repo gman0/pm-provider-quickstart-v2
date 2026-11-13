@@ -1,8 +1,26 @@
-(workspce) Bind providers APIExport:
+# Building
+
+Build pm-access:
 
 ```
-kubectl kcp bind apiexport root:platform-mesh-system:providers.platform-mesh.io --accept-all-permission-claims
+podman build -t localhost:5001/platform-mesh-access -f ~/ws/platform-mesh/sdk/access/Dockerfile ~/ws/platform-mesh
+podman push localhost:5001/platform-mesh-access
 ```
+
+Build api-syncagent-deployer
+
+```
+sh -c 'cd ~/ws/kcp-api-syncagent-deployer && make fullbuild'
+```
+
+Build wildwest
+
+```
+sh -c 'cd ~/ws/pm-provider-quickstart-v2 && make image-push IMAGE_REGISTRY=localhost:5001 IMAGE_TAG=latest'
+sh -c 'cd ~/ws/pm-provider-quickstart-v2 && make portal-image-push IMAGE_REGISTRY=localhost:5001 IMAGE_TAG=latest'
+```
+
+# Cluster setup
 
 Setup the provider cluster:
 
@@ -147,45 +165,41 @@ spec:
     }
 ```
 
-Build pm-access:
+(provider) Deploy flux (needed by api-syncagent-deployer):
 
 ```
-podman build -t localhost:5001/platform-mesh-access -f ~/ws/platform-mesh/sdk/access/Dockerfile ~/ws/platform-mesh
-podman push localhost:5001/platform-mesh-access
+helm upgrade --install flux oci://ghcr.io/fluxcd-community/charts/flux2 \
+  --namespace flux-system \
+  --create-namespace \
+  --set sourceController.create=true \
+  --set helmController.create=true \
+  --set kustomizeController.create=false \
+  --set notificationController.create=false \
+  --set imageAutomationController.create=false \
+  --set imageReflectionController.create=false
 ```
 
-Create selfsigned issuer:
-```
-echo '
-apiVersion: cert-manager.io/v1
-kind: ClusterIssuer
-metadata:
-  name: selfsigned-cluster-issuer
-spec:
-  selfSigned: {}
-' | kubectl apply -f -
-```
+# Deploy
 
-Deploy pm-access:
+(provider) Deploy pm-access:
 
 ```
 NODE_IP=(podman inspect wildwest-provider-control-plane --format '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}') \
-helm upgrade --install platform-mesh-access-sdk ~/ws/platform-mesh/charts/platform-mesh-access-sdk \
-                                   --namespace wildwest --create-namespace \
-                                   --set image.registry=localhost:5001 \
-                                   --set image.repository=platform-mesh-access \
-                                   --set image.tag=latest \
-                                   --set image.pullPolicy=Always \
-                                   --set publicUrl=https://$NODE_IP:32000 \
-                                   --set service.type=NodePort \
-                                   --set service.nodePort=32000 \
-                                   --set tls.issuerRef=selfsigned-cluster-issuer \
-                                   --set-json "tls.ipAddresses=[\"$NODE_IP\"]"
+  helm upgrade --install platform-mesh-access-sdk \
+    ~/ws/platform-mesh/charts/platform-mesh-access-sdk \
+    -n wildwest \
+    --set image.registry=localhost:5001 \
+    --set image.repository=platform-mesh-access \
+    --set image.tag=latest --set image.pullPolicy=Always \
+    --set tls.enabled=false \
+    --set service.type=ClusterIP \
+    --set publicUrl=https://$NODE_IP:32000/pm \
+    --set httpRoute.enabled=true \
+    --set httpRoute.pathPrefix=/pm \
+    --set-json 'httpRoute.parentRefs=[{"group":"gateway.networking.k8s.io","kind":"Gateway","name":"shared","namespace":"envoy-gateway-system"}]'
 ```
 
----
-
-(provider cluster) Apply an AccessIdentity
+(provider) Apply an AccessIdentity
 
 ```
 kubectl-ns wildwest
@@ -198,24 +212,31 @@ spec: {}
 ' | kubectl apply -f -
 ```
 
-(provider cluster) Get the access token
+(provider) Get the access token
 
 ```
 kubectl get secret bob-access-token -o json | jq .data.accessToken -r | base64 -d | wl-copy
 ```
 
-(workspce) Prepare the provider integration:
+(workspce) Bind providers APIExport:
+
+```
+kubectl kcp bind apiexport root:platform-mesh-system:providers.platform-mesh.io --accept-all-permission-claims
+```
+
+(workspce) Apply provider's access token:
 
 ```
 kubectl create secret generic wildwest-token \
   --from-literal accessToken=pma1.aHR0cHM6Ly8xMC44OS4wLjM1OjMyMDAw.VKbTgTHT9_qfgxQtvlWN1g.CZglD0T81A1dX31p3sLZQvscTqBuIQ3HdB7z6UNxy0I
 ```
 
-(provider cluster) get the CA bundle:
+(provider) get the CA bundle:
 ```
-kubectl get secret platform-mesh-access-tls -o json | jq '.data."ca.crt"' -r | base64 -d | wl-copy
+kubectl -n envoy-gateway-system get secret shared-gateway-tls -o json | jq '.data."ca.crt"' -r | base64 -d | wl-copy
 ```
 
+(workspce) Create Provider:
 ```
 echo '
 kind: Provider
@@ -261,27 +282,6 @@ spec:
 ' | kubectl apply -f -
 ```
 
-(provider) Deploy flux
-
-```
-helm upgrade --install flux oci://ghcr.io/fluxcd-community/charts/flux2 \
-  --namespace flux-system \
-  --create-namespace \
-  --set sourceController.create=true \
-  --set helmController.create=true \
-  --set kustomizeController.create=false \
-  --set notificationController.create=false \
-  --set imageAutomationController.create=false \
-  --set imageReflectionController.create=false
-```
-
-
-Build api-syncagent-deployer
-
-```
-sh -c 'cd ~/ws/kcp-api-syncagent-deployer && make fullbuild'
-```
-
 (provider) Deploy api-syncagent-deployer
 
 ```
@@ -293,12 +293,6 @@ helm \
   --set image.pullPolicy=Always \
   --set apiExportEndpointSliceName=cowboys.wildwest.dev \
   --set secretLabelSelector=access-sdk.platform-mesh.io/kubeconfig=true
-```
-
-(provider) Build wildwest:
-
-```
-make image-push IMAGE_REGISTRY=localhost:5001 IMAGE_TAG=latest
 ```
 
 ```
@@ -317,12 +311,14 @@ helm \
   --set image.tag=latest \
   --set image.pullPolicy=Always
 
-helm \
-  install -n wildwest --create-namespace \
-  wildwest-portal ./deploy/helm/wildwest-portal \
+helm upgrade --install wildwest-portal \
+  ~/ws/pm-provider-quickstart-v2/deploy/helm/wildwest-portal \
+  -n wildwest \
   --set image.repository=localhost:5001/provider-quickstart-v2-portal \
-  --set image.tag=latest \
-  --set image.pullPolicy=Always
+  --set image.tag=latest --set image.pullPolicy=Always \
+  --set service.type=ClusterIP \
+  --set httpRoute.enabled=true \
+  --set-json 'httpRoute.parentRefs=[{"group":"gateway.networking.k8s.io","kind":"Gateway","name":"shared","namespace":"envoy-gateway-system"}]'
 ```
 
 ---
