@@ -17,7 +17,6 @@ Build wildwest
 
 ```
 sh -c 'cd ~/ws/pm-provider-quickstart-v2 && make image-push IMAGE_REGISTRY=localhost:5001 IMAGE_TAG=latest'
-sh -c 'cd ~/ws/pm-provider-quickstart-v2 && make portal-image-push IMAGE_REGISTRY=localhost:5001 IMAGE_TAG=latest'
 ```
 
 # Cluster setup
@@ -209,6 +208,48 @@ NODE_IP=(podman inspect wildwest-provider-control-plane --format '{{range .Netwo
     --set-json 'httpRoute.parentRefs=[{"group":"gateway.networking.k8s.io","kind":"Gateway","name":"shared","namespace":"envoy-gateway-system"}]'
 ```
 
+(provider) Deploy api-syncagent-deployer
+
+```
+helm \
+  upgrade --install -n wildwest --create-namespace \
+  api-syncagent-deployer ~/ws/kcp-api-syncagent-deployer/charts/api-syncagent-deployer \
+  --set image.repository=localhost:5001/api-syncagent-deployer \
+  --set image.tag=latest \
+  --set image.pullPolicy=Always \
+  --set apiExportEndpointSliceName=cowboys.wildwest.dev \
+  --set secretLabelSelector=access-sdk.platform-mesh.io/kubeconfig=true
+```
+
+(provider) Deploy wildwest bootstrapper and controller:
+
+```
+helm \
+  upgrade --install -n wildwest --create-namespace \
+  wildwest-bootstrapper ./deploy/helm/wildwest-bootstrapper \
+  --set image.repository=localhost:5001/provider-quickstart-v2 \
+  --set image.tag=latest \
+  --set image.pullPolicy=Always \
+  --set secretLabelSelector=access-sdk.platform-mesh.io/kubeconfig=true
+
+helm \
+  upgrade --install -n wildwest --create-namespace \
+  wildwest-controller ./deploy/helm/wildwest-controller \
+  --set image.repository=localhost:5001/provider-quickstart-v2 \
+  --set image.tag=latest \
+  --set image.pullPolicy=Always
+
+```
+
+# Onboard the provider
+
+(provider) Apply the PublishedResource template:
+
+```
+kubectl-ns wildwest
+kubectl apply -f ./config/provider/cowboys.publishedresource.template.yaml
+```
+
 (provider) Apply an AccessIdentity
 
 ```
@@ -293,45 +334,8 @@ spec:
 ' | kubectl apply -f -
 ```
 
-(provider) Deploy api-syncagent-deployer
 
-```
-helm \
-  upgrade --install -n wildwest --create-namespace \
-  api-syncagent-deployer ~/ws/kcp-api-syncagent-deployer/charts/api-syncagent-deployer \
-  --set image.repository=localhost:5001/api-syncagent-deployer \
-  --set image.tag=latest \
-  --set image.pullPolicy=Always \
-  --set apiExportEndpointSliceName=cowboys.wildwest.dev \
-  --set secretLabelSelector=access-sdk.platform-mesh.io/kubeconfig=true
-```
 
-```
-helm \
-  upgrade --install -n wildwest --create-namespace \
-  wildwest-bootstrapper ./deploy/helm/wildwest-bootstrapper \
-  --set image.repository=localhost:5001/provider-quickstart-v2 \
-  --set image.tag=latest \
-  --set image.pullPolicy=Always \
-  --set secretLabelSelector=access-sdk.platform-mesh.io/kubeconfig=true
-
-helm \
-  upgrade --install -n wildwest --create-namespace \
-  wildwest-controller ./deploy/helm/wildwest-controller \
-  --set image.repository=localhost:5001/provider-quickstart-v2 \
-  --set image.tag=latest \
-  --set image.pullPolicy=Always
-
-helm upgrade --install wildwest-portal \
-  ~/ws/pm-provider-quickstart-v2/deploy/helm/wildwest-portal \
-  -n wildwest \
-  --set image.repository=localhost:5001/provider-quickstart-v2-portal \
-  --set image.tag=latest --set image.pullPolicy=Always \
-  --set service.type=ClusterIP \
-  --set httpRoute.enabled=true \
-  --set-json 'httpRoute.parentRefs=[{"group":"gateway.networking.k8s.io","kind":"Gateway","name":"shared","namespace":"envoy-gateway-system"}]'
-
-```
 
 ---
 

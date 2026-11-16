@@ -7,40 +7,93 @@ metadata:
   name: cowboys-ui
 spec:
   inlineConfiguration:
+    contentType: json
     content: |-
-     {
-      "name": "cowboys",
-      "luigiConfigFragment": {
-        "data": {
-          "nodes": [
-            {
-              "pathSegment": "cowboys",
-              "label": "Cowboys",
-              "hideFromNav": false,
-              "icon": "person-placeholder",
-              "url": "http://wildwest.127-0-0-1.sslip.io:32000",
-              "entityType": "main.core_platform-mesh_io_account",
-              "order": 900,
-              "context": {
-                "accountId": ":core_platform-mesh_io_accountId"
+      {
+        "name": "cowboys",
+        "luigiConfigFragment": {
+          "data": {
+            "nodes": [
+              {
+                "pathSegment": "cowboys",
+                "navigationContext": "cowboys",
+                "label": "Cowboys",
+                "icon": "person-placeholder",
+                "order": 900,
+                "entityType": "main.core_platform-mesh_io_account",
+                "keepSelectedForChildren": true,
+                "url": "/assets/platform-mesh-portal-ui-wc.js#generic-list-view",
+                "webcomponent": { "selfRegistered": true, "type": "module" },
+                "context": {
+                  "accountId": ":core_platform-mesh_io_accountId",
+                  "resourceDefinition": {
+                    "apiGroup": "wildwest_dev",
+                    "version": "v1alpha1",
+                    "entity": "Cowboy",
+                    "entityCollection": "Cowboys",
+                    "scope": "Cluster",
+                    "namespace": null,
+                    "readyCondition": {
+                      "jsonPathExpression": "status.result",
+                      "property": ["status.result"]
+                    },
+                    "ui": {
+                      "listView": {
+                        "fields": [
+                          { "label": "Name",   "property": "metadata.name" },
+                          { "label": "Intent", "property": "spec.intent" },
+                          { "label": "Result", "property": "status.result" }
+                        ]
+                      },
+                      "detailView": {
+                        "fields": [
+                          { "label": "Name",   "property": "metadata.name" },
+                          { "label": "Intent", "property": "spec.intent" },
+                          { "label": "Result", "property": "status.result" }
+                        ]
+                      },
+                      "createView": {
+                        "fields": [
+                          { "label": "Name",   "property": "metadata.name", "required": true },
+                          { "label": "Intent", "property": "spec.intent",   "required": true }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "children": [
+                  {
+                    "pathSegment": ":resourceId",
+                    "hideFromNav": true,
+                    "keepSelectedForChildren": false,
+                    "defineEntity": {
+                      "id": "wildwest_dev_cowboy",
+                      "contextKey": "resourceId",
+                      "graphqlEntity": {
+                        "group": "wildwest_dev",
+                        "version": "v1alpha1",
+                        "kind": "Cowboy",
+                        "query": "{ metadata { name } }"
+                      }
+                    },
+                    "context": { "accountId": ":accountId", "resourceId": ":resourceId" }
+                  }
+                ]
+              },
+              {
+                "entityType": "main.core_platform-mesh_io_account.wildwest_dev_cowboy",
+                "pathSegment": "dashboard",
+                "label": "Overview",
+                "url": "/assets/platform-mesh-portal-ui-wc.js#generic-detail-view",
+                "webcomponent": { "selfRegistered": true, "type": "module" },
+                "defineEntity": { "id": "dashboard" },
+                "compound": { "children": [] }
               }
-            }
-          ],
-          "texts": [
-            {
-              "locale": "",
-              "textDictionary": {
-                "cowboys": "Cowboys"
-              }
-            },
-            {
-              "locale": "en",
-              "textDictionary": {
-                "cowboys": "Cowboys"
-              }
-            }
-          ]
+            ],
+            "texts": [
+              { "locale": "",   "textDictionary": { "cowboys": "Cowboys" } },
+              { "locale": "en", "textDictionary": { "cowboys": "Cowboys" } }
+            ]
+          }
         }
       }
-     }
-    contentType: json

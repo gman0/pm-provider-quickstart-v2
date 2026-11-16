@@ -56,11 +56,6 @@ else
 IMAGE_PUSH_FLAGS ?=
 endif
 
-# Portal image parameters
-PORTAL_IMAGE_NAME ?= provider-quickstart-v2-portal
-PORTAL_IMAGE ?= $(IMAGE_REGISTRY)/$(PORTAL_IMAGE_NAME):$(IMAGE_TAG)
-PORTAL_PORT ?= 4200
-
 .PHONY: all
 all: build
 
@@ -128,23 +123,13 @@ image-build:
 image-push: image-build
 	$(CONTAINER_TOOL) push $(IMAGE_PUSH_FLAGS) $(IMAGE)
 
-## portal-image-build: Build portal container image locally
-.PHONY: portal-image-build
-portal-image-build:
-	$(CONTAINER_TOOL) build -t $(PORTAL_IMAGE) -f deploy/portal.Dockerfile .
-
-## portal-image-push: Push portal container image to registry
-.PHONY: portal-image-push
-portal-image-push: portal-image-build
-	$(CONTAINER_TOOL) push $(IMAGE_PUSH_FLAGS) $(PORTAL_IMAGE)
-
 ## images: Build all container images
 .PHONY: images
-images: image-build portal-image-build
+images: image-build
 
 ## images-push: Push all container images
 .PHONY: images-push
-images-push: image-push portal-image-push
+images-push: image-push
 
 # Kind cluster parameters
 KIND_CLUSTER ?= platform-mesh
@@ -164,31 +149,9 @@ endef
 kind-load: image-build
 	$(call kind_load_image,$(IMAGE))
 
-## kind-load-portal: Load portal image into kind cluster
-.PHONY: kind-load-portal
-kind-load-portal: portal-image-build
-	$(call kind_load_image,$(PORTAL_IMAGE))
-
 ## kind-load-all: Load all images into kind cluster
 .PHONY: kind-load-all
-kind-load-all: kind-load kind-load-portal
-
-## portal-run: Run portal container locally (accessible at http://localhost:$(PORTAL_PORT))
-.PHONY: portal-run
-portal-run:
-	$(CONTAINER_TOOL) run --rm -p $(PORTAL_PORT):8080 $(PORTAL_IMAGE)
-
-## portal-run-detached: Run portal container in background
-.PHONY: portal-run-detached
-portal-run-detached:
-	$(CONTAINER_TOOL) run -d --rm --name wildwest-portal -p $(PORTAL_PORT):80 $(PORTAL_IMAGE)
-	@echo "Portal running at http://localhost:$(PORTAL_PORT)"
-	@echo "Stop with: $(CONTAINER_TOOL) stop wildwest-portal"
-
-## portal-stop: Stop the portal container
-.PHONY: portal-stop
-portal-stop:
-	$(CONTAINER_TOOL) stop wildwest-portal
+kind-load-all: kind-load
 
 ## tools: Install all required tools
 .PHONY: tools
@@ -201,7 +164,7 @@ IMAGE_VERSION ?= $(VERSION)
 # Helm chart publishing parameters
 HELM ?= helm
 HELM_REPO ?= ghcr.io/platform-mesh/provider-quickstart/charts
-HELM_CHARTS ?= wildwest-crds wildwest-controller wildwest-portal wildwest-bootstrapper
+HELM_CHARTS ?= wildwest-crds wildwest-controller wildwest-bootstrapper
 
 ## helm-push: Package and push deployable Helm charts to $(HELM_REPO) as OCI artifacts
 .PHONY: helm-push
