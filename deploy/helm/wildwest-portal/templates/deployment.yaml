@@ -43,6 +43,10 @@ spec:
               value: /data/portal.db
             - name: PORTAL_NAMESPACE
               value: {{ .Values.env.namespace | quote }}
+            {{- if .Values.kubeconfig.secretName }}
+            - name: PORTAL_KUBECONFIG
+              value: /kubeconfig/{{ .Values.kubeconfig.key }}
+            {{- end }}
           ports:
             - name: http
               containerPort: 8080
@@ -64,6 +68,11 @@ spec:
           volumeMounts:
             - name: data
               mountPath: /data
+            {{- if .Values.kubeconfig.secretName }}
+            - name: kubeconfig
+              mountPath: /kubeconfig
+              readOnly: true
+            {{- end }}
       volumes:
         - name: data
           {{- if .Values.persistence.enabled }}
@@ -72,6 +81,11 @@ spec:
           {{- else }}
           emptyDir: {}
           {{- end }}
+        {{- if .Values.kubeconfig.secretName }}
+        - name: kubeconfig
+          secret:
+            secretName: {{ .Values.kubeconfig.secretName }}
+        {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

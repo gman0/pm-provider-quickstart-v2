@@ -12,6 +12,7 @@ import (
 
 	"github.com/gman0/provider-quickstart-v2/pkg/portal/config"
 	"github.com/gman0/provider-quickstart-v2/pkg/portal/db"
+	"github.com/gman0/provider-quickstart-v2/pkg/portal/kcp"
 	"github.com/gman0/provider-quickstart-v2/pkg/portal/server"
 )
 
@@ -37,7 +38,13 @@ func main() {
 		os.Exit(1)
 	}
 
-	srv := server.New(cfg, store)
+	kcpClient, err := kcp.New(cfg.Kubeconfig, cfg.Namespace)
+	if err != nil {
+		slog.Error("kcp client", "err", err)
+		os.Exit(1)
+	}
+
+	srv := server.New(cfg, store, kcpClient)
 	httpSrv := &http.Server{
 		Addr:              cfg.ListenAddr,
 		Handler:           srv.Handler(),

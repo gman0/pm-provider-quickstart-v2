@@ -21,6 +21,13 @@ rbac:
 env:
   namespace: wildwest
 
+# kubeconfig points at the wildwest kcp workspace. If empty the portal falls
+# back to in-cluster config — fine when the portal runs inside the same k8s
+# cluster that holds the AccessIdentity CRDs, not when the target is kcp.
+kubeconfig:
+  secretName: ""
+  key: kubeconfig
+
 persistence:
   enabled: true
   storageClass: ""

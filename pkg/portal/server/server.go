@@ -1,20 +1,24 @@
 package server
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/gman0/provider-quickstart-v2/pkg/portal/auth"
 	"github.com/gman0/provider-quickstart-v2/pkg/portal/config"
 	"github.com/gman0/provider-quickstart-v2/pkg/portal/db"
+	"github.com/gman0/provider-quickstart-v2/pkg/portal/kcp"
+	"github.com/gman0/provider-quickstart-v2/pkg/portal/wildwest"
 )
 
 type Server struct {
 	cfg   *config.Config
 	store *db.Store
+	kcp   *kcp.Client
 }
 
-func New(cfg *config.Config, store *db.Store) *Server {
-	return &Server{cfg: cfg, store: store}
+func New(cfg *config.Config, store *db.Store, k *kcp.Client) *Server {
+	return &Server{cfg: cfg, store: store, kcp: k}
 }
 
 func (s *Server) Handler() http.Handler {
@@ -33,7 +37,12 @@ func (s *Server) Handler() http.Handler {
 		_, _ = w.Write([]byte("ok"))
 	})
 
-	auth.New(s.store).Register(mux)
+	authHandlers := auth.New(s.store)
+	authHandlers.BeforeDeleteUser = func(ctx context.Context, userID string) error {
+		return wildwest.CascadeDeleteUser(ctx, s.kcp, userID)
+	}
+	authHandlers.Register(mux)
+	wildwest.New(s.store, s.kcp).Register(mux)
 
 	mux.Handle("/", spaHandler())
 
