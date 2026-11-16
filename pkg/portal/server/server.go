@@ -3,6 +3,7 @@ package server
 import (
 	"net/http"
 
+	"github.com/gman0/provider-quickstart-v2/pkg/portal/auth"
 	"github.com/gman0/provider-quickstart-v2/pkg/portal/config"
 	"github.com/gman0/provider-quickstart-v2/pkg/portal/db"
 )
@@ -32,9 +33,7 @@ func (s *Server) Handler() http.Handler {
 		_, _ = w.Write([]byte("ok"))
 	})
 
-	mux.HandleFunc("GET /api/", func(w http.ResponseWriter, _ *http.Request) {
-		http.Error(w, "not implemented", http.StatusNotImplemented)
-	})
+	auth.New(s.store).Register(mux)
 
 	mux.Handle("/", spaHandler())
 

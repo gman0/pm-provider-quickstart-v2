@@ -1,27 +1,30 @@
-import { useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
+import { AuthProvider, useAuth } from './auth';
+import Login from './pages/Login';
+import Register from './pages/Register';
+import Dashboard from './pages/Dashboard';
 
 export default function App() {
-  const health = useQuery({
-    queryKey: ['healthz'],
-    queryFn: async () => {
-      const r = await fetch('/healthz');
-      if (!r.ok) throw new Error(`healthz ${r.status}`);
-      return r.text();
-    },
-  });
-
   return (
-    <main className="mx-auto max-w-2xl p-8">
-      <h1 className="text-2xl font-semibold">Wildwest Portal</h1>
-      <p className="mt-2 text-sm text-neutral-600">Skeleton — milestone 1.</p>
-      <div className="mt-6 rounded border border-neutral-200 bg-white p-4 shadow-sm">
-        <div className="text-sm font-medium">Server health</div>
-        <div className="mt-1 text-sm">
-          {health.isLoading && <span className="text-neutral-500">checking…</span>}
-          {health.isError && <span className="text-red-600">error: {String(health.error)}</span>}
-          {health.data && <span className="text-emerald-700">ok</span>}
-        </div>
-      </div>
-    </main>
+    <AuthProvider>
+      <Shell />
+    </AuthProvider>
   );
+}
+
+function Shell() {
+  const { me, loading } = useAuth();
+  const [mode, setMode] = useState<'login' | 'register'>('login');
+
+  if (loading) {
+    return <div className="p-8 text-sm text-neutral-500">Loading…</div>;
+  }
+  if (!me) {
+    return mode === 'login' ? (
+      <Login onDone={() => {}} onSwitch={() => setMode('register')} />
+    ) : (
+      <Register onDone={() => {}} onSwitch={() => setMode('login')} />
+    );
+  }
+  return <Dashboard />;
 }
