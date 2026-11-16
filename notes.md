@@ -51,6 +51,16 @@ helm install \
 helm install eg oci://docker.io/envoyproxy/gateway-helm \
   --version v1.10.0 -n envoy-gateway-system --create-namespace
 
+echo "
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: selfsigned-cluster-issuer
+  namespace: envoy-gateway-system
+spec:
+  selfSigned: {}
+" | kubectl apply -f -
+
 NODE_IP=(podman inspect wildwest-provider-control-plane --format '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}') \
 echo "
 apiVersion: cert-manager.io/v1
@@ -149,7 +159,7 @@ spec:
         prometheus :9153
         template IN A pm.127-0-0-1.sslip.io {
            match (^|\.)pm\.127-0-0-1\.sslip\.io\.$
-           answer "{{ .Name }} 30 IN A 10.89.0.34"
+           answer "{{ .Name }} 30 IN A 10.89.0.36"
            fallthrough
         }
         forward . /etc/resolv.conf {
@@ -187,7 +197,7 @@ helm upgrade --install flux oci://ghcr.io/fluxcd-community/charts/flux2 \
 NODE_IP=(podman inspect wildwest-provider-control-plane --format '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}') \
   helm upgrade --install platform-mesh-access-sdk \
     ~/ws/platform-mesh/charts/platform-mesh-access-sdk \
-    -n wildwest \
+    -n wildwest --create-namespace \
     --set image.registry=localhost:5001 \
     --set image.repository=platform-mesh-access \
     --set image.tag=latest --set image.pullPolicy=Always \
@@ -228,7 +238,7 @@ kubectl kcp bind apiexport root:platform-mesh-system:providers.platform-mesh.io 
 
 ```
 kubectl create secret generic wildwest-token \
-  --from-literal accessToken=pma1.aHR0cHM6Ly8xMC44OS4wLjM1OjMyMDAw.VKbTgTHT9_qfgxQtvlWN1g.CZglD0T81A1dX31p3sLZQvscTqBuIQ3HdB7z6UNxy0I
+  --from-literal accessToken=pma1.aHR0cHM6Ly8xMC44OS4wLjM3OjMyMDAwL3Bt.NunmQTcelNQYxp2RYwpITA.FnJdzEo86RtYyT85K3-loYQkyYn9OfiRVAZZb1qYeGo
 ```
 
 (provider) get the CA bundle:
@@ -247,23 +257,24 @@ spec:
   remote:
     caBundle: |
       -----BEGIN CERTIFICATE-----
-      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
+      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
       -----END CERTIFICATE-----
+
 ' | kubectl apply -f -
 ```
 
@@ -319,6 +330,7 @@ helm upgrade --install wildwest-portal \
   --set service.type=ClusterIP \
   --set httpRoute.enabled=true \
   --set-json 'httpRoute.parentRefs=[{"group":"gateway.networking.k8s.io","kind":"Gateway","name":"shared","namespace":"envoy-gateway-system"}]'
+
 ```
 
 ---
