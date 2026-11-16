@@ -9,6 +9,10 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
+func (c *Client) GetAccessRaw(ctx context.Context, name string) (*unstructured.Unstructured, error) {
+	return c.Dyn.Resource(AccessGVR).Namespace(c.Namespace).Get(ctx, name, metav1.GetOptions{})
+}
+
 type Access struct {
 	Name             string
 	IdentityName     string

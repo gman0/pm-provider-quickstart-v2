@@ -1,5 +1,7 @@
+import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api';
+import AccessDetail from './AccessDetail';
 
 interface AccessView {
   name: string;
@@ -13,6 +15,7 @@ interface AccessView {
 
 export default function Accesses() {
   const qc = useQueryClient();
+  const [selected, setSelected] = useState<string | null>(null);
   const q = useQuery({
     queryKey: ['accesses'],
     queryFn: () => api<AccessView[]>('/api/accesses'),
@@ -20,7 +23,10 @@ export default function Accesses() {
   });
   const deleteMut = useMutation({
     mutationFn: (name: string) => api(`/api/accesses/${name}`, { method: 'DELETE' }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['accesses'] }),
+    onSuccess: (_, name) => {
+      qc.invalidateQueries({ queryKey: ['accesses'] });
+      if (selected === name) setSelected(null);
+    },
   });
 
   return (
@@ -49,7 +55,14 @@ export default function Accesses() {
             </thead>
             <tbody>
               {q.data.map((a) => (
-                <tr key={a.name} className="border-b border-neutral-100">
+                <tr
+                  key={a.name}
+                  className={
+                    'border-b border-neutral-100 cursor-pointer hover:bg-neutral-50 ' +
+                    (selected === a.name ? 'bg-neutral-50' : '')
+                  }
+                  onClick={() => setSelected(a.name)}
+                >
                   <td className="py-2 pr-4">
                     <div className="font-medium font-mono text-xs">{a.name}</div>
                     {a.kubeconfigSecret && (
@@ -76,7 +89,8 @@ export default function Accesses() {
                   </td>
                   <td className="py-2 text-right">
                     <button
-                      onClick={() => {
+                      onClick={(e) => {
+                        e.stopPropagation();
                         if (confirm(`Delete Access "${a.name}"? The PM side's credential will stop working.`)) {
                           deleteMut.mutate(a.name);
                         }
@@ -92,6 +106,8 @@ export default function Accesses() {
           </table>
         )}
       </div>
+
+      {selected && <AccessDetail name={selected} onClose={() => setSelected(null)} />}
     </section>
   );
 }

@@ -8,6 +8,7 @@ import (
 	"github.com/gman0/provider-quickstart-v2/pkg/portal/config"
 	"github.com/gman0/provider-quickstart-v2/pkg/portal/db"
 	"github.com/gman0/provider-quickstart-v2/pkg/portal/kcp"
+	"github.com/gman0/provider-quickstart-v2/pkg/portal/profile"
 	"github.com/gman0/provider-quickstart-v2/pkg/portal/wildwest"
 )
 
@@ -42,6 +43,7 @@ func (s *Server) Handler() http.Handler {
 		return wildwest.CascadeDeleteUser(ctx, s.kcp, userID)
 	}
 	authHandlers.Register(mux)
+	profile.New(s.store).Register(mux)
 	wildwest.New(s.store, s.kcp).Register(mux)
 
 	mux.Handle("/", spaHandler())

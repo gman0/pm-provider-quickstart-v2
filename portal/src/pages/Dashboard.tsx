@@ -2,8 +2,9 @@ import { useState } from 'react';
 import { useAuth } from '../auth';
 import Tokens from './Tokens';
 import Accesses from './Accesses';
+import Profile from './Profile';
 
-type Tab = 'tokens' | 'accesses' | 'settings';
+type Tab = 'tokens' | 'accesses' | 'profile' | 'settings';
 
 export default function Dashboard() {
   const { me, logout, deleteAccount } = useAuth();
@@ -20,12 +21,14 @@ export default function Dashboard() {
       <nav className="mt-4 flex gap-6 text-sm">
         <TabBtn label="Tokens" active={tab === 'tokens'} onClick={() => setTab('tokens')} />
         <TabBtn label="Accesses" active={tab === 'accesses'} onClick={() => setTab('accesses')} />
+        <TabBtn label="Profile" active={tab === 'profile'} onClick={() => setTab('profile')} />
         <TabBtn label="Settings" active={tab === 'settings'} onClick={() => setTab('settings')} />
       </nav>
 
       <main className="mt-6">
         {tab === 'tokens' && <Tokens />}
         {tab === 'accesses' && <Accesses />}
+        {tab === 'profile' && <Profile />}
         {tab === 'settings' && (
           <section>
             <h2 className="text-lg font-semibold">Settings</h2>

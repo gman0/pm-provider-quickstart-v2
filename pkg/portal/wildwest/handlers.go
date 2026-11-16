@@ -10,11 +10,13 @@ import (
 	"time"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	"github.com/gman0/provider-quickstart-v2/pkg/portal/auth"
 	"github.com/gman0/provider-quickstart-v2/pkg/portal/db"
 	"github.com/gman0/provider-quickstart-v2/pkg/portal/kcp"
 )
+
 
 type Handlers struct {
 	Store *db.Store
@@ -33,6 +35,7 @@ func (h *Handlers) Register(mux *http.ServeMux) {
 
 	mux.HandleFunc("GET /api/accesses", auth.Required(h.Store, h.listAccesses))
 	mux.HandleFunc("GET /api/accesses/{name}", auth.Required(h.Store, h.getAccess))
+	mux.HandleFunc("GET /api/accesses/{name}/raw", auth.Required(h.Store, h.getAccessRaw))
 	mux.HandleFunc("DELETE /api/accesses/{name}", auth.Required(h.Store, h.deleteAccess))
 }
 
@@ -245,18 +248,53 @@ func (h *Handlers) getAccess(w http.ResponseWriter, r *http.Request) {
 		h.k8sErr(w, err, "get access")
 		return
 	}
-	if !h.userOwns(r.Context(), user.ID, a.IdentityName) {
+	// Resolve the owning identity note while checking ownership — same
+	// label-selector list call either way, no extra round-trip cost.
+	identities, err := h.KCP.ListIdentities(r.Context(), user.ID)
+	if err != nil {
+		slog.Error("list identities", "err", err)
+		auth.WriteErr(w, http.StatusInternalServerError, "list failed")
+		return
+	}
+	var note string
+	owned := false
+	for _, id := range identities {
+		if id.Name == a.IdentityName {
+			owned = true
+			note = id.Note
+			break
+		}
+	}
+	if !owned {
 		auth.WriteErr(w, http.StatusNotFound, "not found")
 		return
 	}
 	auth.WriteJSON(w, http.StatusOK, accessView{
 		Name:             a.Name,
 		IdentityName:     a.IdentityName,
+		Note:             note,
 		Phase:            a.Phase,
 		LastRefreshed:    a.LastRefreshed,
 		KubeconfigSecret: a.KubeconfigSecret,
 		CreatedAt:        a.CreatedAt,
 	})
+}
+
+func (h *Handlers) getAccessRaw(w http.ResponseWriter, r *http.Request) {
+	user := auth.UserFromContext(r.Context())
+	name := r.PathValue("name")
+
+	raw, err := h.KCP.GetAccessRaw(r.Context(), name)
+	if err != nil {
+		h.k8sErr(w, err, "get access raw")
+		return
+	}
+	identityName, _, _ := unstructured.NestedString(raw.Object, "spec", "identityRef", "name")
+	if !h.userOwns(r.Context(), user.ID, identityName) {
+		auth.WriteErr(w, http.StatusNotFound, "not found")
+		return
+	}
+	auth.WriteJSON(w, http.StatusOK, raw.Object)
 }
 
 func (h *Handlers) deleteAccess(w http.ResponseWriter, r *http.Request) {
