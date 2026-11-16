@@ -19,6 +19,12 @@ Build wildwest
 sh -c 'cd ~/ws/pm-provider-quickstart-v2 && make image-push IMAGE_REGISTRY=localhost:5001 IMAGE_TAG=latest'
 ```
 
+Build provider portal
+
+```
+sh -c 'cd ~/ws/pm-provider-quickstart-v2 && make portal-image-push IMAGE_REGISTRY=localhost:5001 IMAGE_TAG=latest'
+```
+
 # Cluster setup
 
 Setup the provider cluster:
@@ -238,6 +244,18 @@ helm \
   --set image.repository=localhost:5001/provider-quickstart-v2 \
   --set image.tag=latest \
   --set image.pullPolicy=Always
+
+helm \
+  upgrade --install wildwest-portal \
+  ~/ws/pm-provider-quickstart-v2/deploy/helm/wildwest-portal \
+  -n wildwest --create-namespace \
+  --set image.repository=localhost:5001/provider-quickstart-v2-portal \
+  --set image.tag=latest --set image.pullPolicy=Always \
+  --set env.namespace=wildwest \
+  --set service.type=ClusterIP \
+  --set httpRoute.enabled=true \
+  --set-json 'httpRoute.parentRefs=[{"group":"gateway.networking.k8s.io","kind":"Gateway","name":"shared","namespace":"envoy-gateway-system"}]' \
+  --set-json 'httpRoute.hostnames=["wildwest.127-0-0-1.sslip.io"]'
 
 ```
 

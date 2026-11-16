@@ -2,6 +2,7 @@ package kcp
 
 import (
 	"bytes"
+	"strings"
 	"text/template"
 )
 
@@ -21,13 +22,20 @@ apiVersion: providers.platform-mesh.io/v1alpha1
 kind: Provider
 metadata:
   name: {{ .ProviderName }}
+{{- if .CABundle }}
+spec:
+  remote:
+    caBundle: |
+{{ indent 6 .CABundle }}
+{{- else }}
 spec:
   remote: {}
+{{- end }}
 ---
 apiVersion: providers.platform-mesh.io/v1alpha1
 kind: ProviderAccessRequest
 metadata:
-  name: {{ .IdentityName }}-par
+  name: {{ .ProviderName }}
 spec:
   providerRef:
     name: {{ .ProviderName }}
@@ -41,15 +49,23 @@ type BundleInput struct {
 	IdentityName string
 	AccessToken  string
 	ProviderName string
+	CABundle     string
 }
 
 func RenderBundle(in BundleInput) (string, error) {
-	t, err := template.New("bundle").Parse(bundleTpl)
-	if err != nil {
-		return "", err
-	}
 	if in.ProviderName == "" {
 		in.ProviderName = ProviderName
+	}
+	funcs := template.FuncMap{
+		"indent": func(spaces int, s string) string {
+			pad := strings.Repeat(" ", spaces)
+			trimmed := strings.TrimRight(s, "\n")
+			return pad + strings.ReplaceAll(trimmed, "\n", "\n"+pad)
+		},
+	}
+	t, err := template.New("bundle").Funcs(funcs).Parse(bundleTpl)
+	if err != nil {
+		return "", err
 	}
 	var b bytes.Buffer
 	if err := t.Execute(&b, in); err != nil {

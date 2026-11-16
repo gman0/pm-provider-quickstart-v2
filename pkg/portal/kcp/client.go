@@ -9,8 +9,8 @@ import (
 )
 
 var (
-	IdentityGVR = schema.GroupVersionResource{Group: "access.platform-mesh.io", Version: "v1alpha1", Resource: "accessidentities"}
-	AccessGVR   = schema.GroupVersionResource{Group: "access.platform-mesh.io", Version: "v1alpha1", Resource: "accesses"}
+	IdentityGVR = schema.GroupVersionResource{Group: "access-sdk.platform-mesh.io", Version: "v1alpha1", Resource: "accessidentities"}
+	AccessGVR   = schema.GroupVersionResource{Group: "access-sdk.platform-mesh.io", Version: "v1alpha1", Resource: "accesses"}
 
 	LabelPortalUser = "wildwest.dev/portal-user"
 	AnnotationNote  = "wildwest.dev/note"
@@ -20,10 +20,20 @@ type Client struct {
 	Dyn       dynamic.Interface
 	Core      kubernetes.Interface
 	Namespace string
+
+	CABundleRef SecretRef
 }
 
-func New(kubeconfigPath, namespace string) (*Client, error) {
-	cfg, err := loadConfig(kubeconfigPath)
+type SecretRef struct {
+	Namespace string
+	Name      string
+	Key       string
+}
+
+func (r SecretRef) Valid() bool { return r.Namespace != "" && r.Name != "" && r.Key != "" }
+
+func New(namespace string) (*Client, error) {
+	cfg, err := loadConfig()
 	if err != nil {
 		return nil, err
 	}
@@ -38,9 +48,16 @@ func New(kubeconfigPath, namespace string) (*Client, error) {
 	return &Client{Dyn: dyn, Core: core, Namespace: namespace}, nil
 }
 
-func loadConfig(kubeconfigPath string) (*rest.Config, error) {
-	if kubeconfigPath != "" {
-		return clientcmd.BuildConfigFromFlags("", kubeconfigPath)
+// loadConfig prefers in-cluster config (the production path — portal runs in
+// the provider's own cluster, same one that holds the AccessIdentity CRs) and
+// falls back to the standard kubeconfig discovery (KUBECONFIG env or
+// ~/.kube/config) so local `./bin/portal` works without extra setup.
+func loadConfig() (*rest.Config, error) {
+	if cfg, err := rest.InClusterConfig(); err == nil {
+		return cfg, nil
 	}
-	return rest.InClusterConfig()
+	return clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
+		clientcmd.NewDefaultClientConfigLoadingRules(),
+		&clientcmd.ConfigOverrides{},
+	).ClientConfig()
 }

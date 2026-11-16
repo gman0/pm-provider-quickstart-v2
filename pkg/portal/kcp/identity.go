@@ -25,7 +25,7 @@ func (c *Client) CreateIdentity(ctx context.Context, portalUserID, note string) 
 	u := &unstructured.Unstructured{}
 	u.SetGroupVersionKind(IdentityGVR.GroupVersion().WithKind("AccessIdentity"))
 	u.SetNamespace(c.Namespace)
-	u.SetGenerateName("wildwest-ident-")
+	u.SetGenerateName("wildwest-")
 	u.SetLabels(map[string]string{LabelPortalUser: portalUserID})
 	if note != "" {
 		u.SetAnnotations(map[string]string{AnnotationNote: note})
@@ -66,6 +66,24 @@ func (c *Client) DeleteIdentity(ctx context.Context, name string) error {
 		return nil
 	}
 	return err
+}
+
+// FetchCABundle reads the configured CA bundle Secret and returns the PEM
+// payload. Returns "" if the ref isn't configured (caller should then omit
+// spec.remote.caBundle from the Provider CR).
+func (c *Client) FetchCABundle(ctx context.Context) (string, error) {
+	if !c.CABundleRef.Valid() {
+		return "", nil
+	}
+	sec, err := c.Core.CoreV1().Secrets(c.CABundleRef.Namespace).Get(ctx, c.CABundleRef.Name, metav1.GetOptions{})
+	if err != nil {
+		return "", err
+	}
+	v, ok := sec.Data[c.CABundleRef.Key]
+	if !ok || len(v) == 0 {
+		return "", fmt.Errorf("key %q missing in secret %s/%s", c.CABundleRef.Key, c.CABundleRef.Namespace, c.CABundleRef.Name)
+	}
+	return string(v), nil
 }
 
 // FetchToken reads the plaintext pma1 token from the Secret owned by the

@@ -1,0 +1,30 @@
+{{- if and .Values.rbac.create .Values.caBundle.enabled -}}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "wildwest-portal.fullname" . }}-cabundle
+  namespace: {{ .Values.caBundle.secretRef.namespace }}
+  labels:
+    {{- include "wildwest-portal.labels" . | nindent 4 }}
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    resourceNames: [{{ .Values.caBundle.secretRef.name | quote }}]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "wildwest-portal.fullname" . }}-cabundle
+  namespace: {{ .Values.caBundle.secretRef.namespace }}
+  labels:
+    {{- include "wildwest-portal.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "wildwest-portal.fullname" . }}-cabundle
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "wildwest-portal.serviceAccountName" . }}
+    namespace: {{ .Release.Namespace }}
+{{- end }}

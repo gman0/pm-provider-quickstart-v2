@@ -43,9 +43,13 @@ spec:
               value: /data/portal.db
             - name: PORTAL_NAMESPACE
               value: {{ .Values.env.namespace | quote }}
-            {{- if .Values.kubeconfig.secretName }}
-            - name: PORTAL_KUBECONFIG
-              value: /kubeconfig/{{ .Values.kubeconfig.key }}
+            {{- if .Values.caBundle.enabled }}
+            - name: PORTAL_CABUNDLE_NAMESPACE
+              value: {{ .Values.caBundle.secretRef.namespace | quote }}
+            - name: PORTAL_CABUNDLE_NAME
+              value: {{ .Values.caBundle.secretRef.name | quote }}
+            - name: PORTAL_CABUNDLE_KEY
+              value: {{ .Values.caBundle.secretRef.key | quote }}
             {{- end }}
           ports:
             - name: http
@@ -68,11 +72,6 @@ spec:
           volumeMounts:
             - name: data
               mountPath: /data
-            {{- if .Values.kubeconfig.secretName }}
-            - name: kubeconfig
-              mountPath: /kubeconfig
-              readOnly: true
-            {{- end }}
       volumes:
         - name: data
           {{- if .Values.persistence.enabled }}
@@ -81,11 +80,6 @@ spec:
           {{- else }}
           emptyDir: {}
           {{- end }}
-        {{- if .Values.kubeconfig.secretName }}
-        - name: kubeconfig
-          secret:
-            secretName: {{ .Values.kubeconfig.secretName }}
-        {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

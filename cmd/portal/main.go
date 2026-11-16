@@ -38,10 +38,15 @@ func main() {
 		os.Exit(1)
 	}
 
-	kcpClient, err := kcp.New(cfg.Kubeconfig, cfg.Namespace)
+	kcpClient, err := kcp.New(cfg.Namespace)
 	if err != nil {
 		slog.Error("kcp client", "err", err)
 		os.Exit(1)
+	}
+	kcpClient.CABundleRef = kcp.SecretRef{
+		Namespace: cfg.CABundleNamespace,
+		Name:      cfg.CABundleName,
+		Key:       cfg.CABundleKey,
 	}
 
 	srv := server.New(cfg, store, kcpClient)

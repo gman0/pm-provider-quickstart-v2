@@ -21,17 +21,20 @@ rbac:
 env:
   namespace: wildwest
 
-# kubeconfig points at the wildwest kcp workspace. If empty the portal falls
-# back to in-cluster config — fine when the portal runs inside the same k8s
-# cluster that holds the AccessIdentity CRDs, not when the target is kcp.
-kubeconfig:
-  secretName: ""
-  key: kubeconfig
+# CA bundle to stamp into the generated Provider's spec.remote.caBundle so PM
+# accepts the wildwest /access endpoint's TLS. Portal reads the Secret on
+# every bundle render — rotation is picked up automatically.
+caBundle:
+  enabled: true
+  secretRef:
+    namespace: envoy-gateway-system
+    name: shared-gateway-tls
+    key: ca.crt
 
 persistence:
   enabled: true
   storageClass: ""
-  size: 1Gi
+  size: 10Mi
   accessModes:
     - ReadWriteOnce
 

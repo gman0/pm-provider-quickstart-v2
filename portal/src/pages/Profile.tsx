@@ -18,38 +18,21 @@ interface Payment {
 }
 
 export default function Profile() {
-  const [tab, setTab] = useState<'contact' | 'payment'>('contact');
   return (
-    <section>
+    <section className="max-w-xl">
       <h2 className="text-lg font-semibold">Profile</h2>
       <p className="mt-1 text-sm text-neutral-600">
         Placeholder pages — the portal demo doesn't gate anything on these.
       </p>
-      <div className="mt-4 flex gap-6 border-b border-neutral-200 text-sm">
-        <SubTab label="Contact" active={tab === 'contact'} onClick={() => setTab('contact')} />
-        <SubTab label="Payment" active={tab === 'payment'} onClick={() => setTab('payment')} />
+      <div className="mt-6 space-y-10">
+        <ContactSection />
+        <PaymentSection />
       </div>
-      <div className="mt-6">{tab === 'contact' ? <ContactForm /> : <PaymentForm />}</div>
     </section>
   );
 }
 
-function SubTab({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
-  return (
-    <button
-      onClick={onClick}
-      className={
-        active
-          ? 'border-b-2 border-neutral-900 pb-2 font-medium text-neutral-900'
-          : 'pb-2 text-neutral-500 hover:text-neutral-900'
-      }
-    >
-      {label}
-    </button>
-  );
-}
-
-function ContactForm() {
+function ContactSection() {
   const qc = useQueryClient();
   const q = useQuery({ queryKey: ['contact'], queryFn: () => api<Contact>('/api/profile/contact') });
   const [form, setForm] = useState<Contact>({ fullName: '', company: '', supportEmail: '' });
@@ -71,36 +54,39 @@ function ContactForm() {
   });
 
   return (
-    <form
-      onSubmit={(e) => {
-        e.preventDefault();
-        save.mutate(form);
-      }}
-      className="max-w-md space-y-4"
-    >
-      <Field label="Full name" value={form.fullName} onChange={(v) => setForm({ ...form, fullName: v })} />
-      <Field label="Company" value={form.company} onChange={(v) => setForm({ ...form, company: v })} />
-      <Field
-        label="Support email"
-        type="email"
-        value={form.supportEmail}
-        onChange={(v) => setForm({ ...form, supportEmail: v })}
-      />
-      <div className="flex items-center gap-3">
-        <button
-          type="submit"
-          disabled={save.isPending}
-          className="rounded bg-neutral-900 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
-        >
-          {save.isPending ? 'Saving…' : 'Save'}
-        </button>
-        {status && <span className="text-sm text-neutral-600">{status}</span>}
-      </div>
-    </form>
+    <div>
+      <h3 className="text-sm font-medium uppercase tracking-wide text-neutral-500">Contact</h3>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          save.mutate(form);
+        }}
+        className="mt-3 space-y-4"
+      >
+        <Field label="Full name" value={form.fullName} onChange={(v) => setForm({ ...form, fullName: v })} />
+        <Field label="Company" value={form.company} onChange={(v) => setForm({ ...form, company: v })} />
+        <Field
+          label="Support email"
+          type="email"
+          value={form.supportEmail}
+          onChange={(v) => setForm({ ...form, supportEmail: v })}
+        />
+        <div className="flex items-center gap-3">
+          <button
+            type="submit"
+            disabled={save.isPending}
+            className="rounded bg-neutral-900 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
+          >
+            {save.isPending ? 'Saving…' : 'Save contact'}
+          </button>
+          {status && <span className="text-sm text-neutral-600">{status}</span>}
+        </div>
+      </form>
+    </div>
   );
 }
 
-function PaymentForm() {
+function PaymentSection() {
   const qc = useQueryClient();
   const q = useQuery({ queryKey: ['payment'], queryFn: () => api<Payment>('/api/profile/payment') });
   const [holder, setHolder] = useState('');
@@ -135,9 +121,10 @@ function PaymentForm() {
   });
 
   return (
-    <div className="max-w-md space-y-4">
+    <div>
+      <h3 className="text-sm font-medium uppercase tracking-wide text-neutral-500">Payment</h3>
       {onFile && (
-        <div className="rounded border border-emerald-200 bg-emerald-50 p-3 text-sm">
+        <div className="mt-3 rounded border border-emerald-200 bg-emerald-50 p-3 text-sm">
           <div className="font-medium text-emerald-900">Payment method on file</div>
           <div className="mt-1 text-emerald-800">
             {q.data!.cardHolder} • **** {q.data!.cardLast4} • {q.data!.expMonth.toString().padStart(2, '0')}/
@@ -145,7 +132,7 @@ function PaymentForm() {
           </div>
         </div>
       )}
-      <div className="text-xs text-neutral-500">
+      <div className="mt-3 text-xs text-neutral-500">
         Demo only — no card data is sent to a payment processor. Only the last 4
         digits and holder name are stored.
       </div>
@@ -154,7 +141,7 @@ function PaymentForm() {
           e.preventDefault();
           save.mutate();
         }}
-        className="space-y-4"
+        className="mt-3 space-y-4"
       >
         <Field label="Cardholder name" value={holder} onChange={setHolder} />
         <Field label="Card number" value={number} onChange={setNumber} placeholder="4111 1111 1111 1111" />
@@ -168,7 +155,7 @@ function PaymentForm() {
             disabled={save.isPending}
             className="rounded bg-neutral-900 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
           >
-            {save.isPending ? 'Saving…' : onFile ? 'Replace card' : 'Save'}
+            {save.isPending ? 'Saving…' : onFile ? 'Replace card' : 'Save payment'}
           </button>
           {status && <span className="text-sm text-neutral-600">{status}</span>}
         </div>

@@ -134,7 +134,13 @@ func (h *Handlers) createToken(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	bundle, err := kcp.RenderBundle(kcp.BundleInput{IdentityName: id.Name, AccessToken: token})
+	caBundle, err := h.KCP.FetchCABundle(r.Context())
+	if err != nil {
+		slog.Error("fetch ca bundle", "err", err)
+		auth.WriteErr(w, http.StatusInternalServerError, "ca bundle read failed")
+		return
+	}
+	bundle, err := kcp.RenderBundle(kcp.BundleInput{IdentityName: id.Name, AccessToken: token, CABundle: caBundle})
 	if err != nil {
 		slog.Error("render bundle", "err", err)
 		auth.WriteErr(w, http.StatusInternalServerError, "bundle failed")
@@ -169,7 +175,13 @@ func (h *Handlers) tokenBundle(w http.ResponseWriter, r *http.Request) {
 		auth.WriteErr(w, http.StatusGatewayTimeout, "token secret not readable")
 		return
 	}
-	bundle, err := kcp.RenderBundle(kcp.BundleInput{IdentityName: name, AccessToken: token})
+	caBundle, err := h.KCP.FetchCABundle(r.Context())
+	if err != nil {
+		slog.Error("fetch ca bundle", "err", err)
+		auth.WriteErr(w, http.StatusInternalServerError, "ca bundle read failed")
+		return
+	}
+	bundle, err := kcp.RenderBundle(kcp.BundleInput{IdentityName: name, AccessToken: token, CABundle: caBundle})
 	if err != nil {
 		auth.WriteErr(w, http.StatusInternalServerError, "bundle failed")
 		return

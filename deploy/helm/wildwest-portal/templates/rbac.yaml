@@ -7,10 +7,10 @@ metadata:
   labels:
     {{- include "wildwest-portal.labels" . | nindent 4 }}
 rules:
-  - apiGroups: ["access.platform-mesh.io"]
+  - apiGroups: ["access-sdk.platform-mesh.io"]
     resources: ["accessidentities"]
     verbs: ["create", "get", "list", "watch", "delete", "patch", "update"]
-  - apiGroups: ["access.platform-mesh.io"]
+  - apiGroups: ["access-sdk.platform-mesh.io"]
     resources: ["accesses"]
     verbs: ["get", "list", "watch", "delete"]
   - apiGroups: [""]

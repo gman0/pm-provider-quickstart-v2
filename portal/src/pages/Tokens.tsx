@@ -10,7 +10,7 @@ interface TokenView {
   accessCount: number;
 }
 
-interface CreateTokenResponse {
+interface BundleResponse {
   identity: string;
   note: string;
   accessToken: string;
@@ -24,26 +24,35 @@ export default function Tokens() {
     queryFn: () => api<TokenView[]>('/api/tokens'),
   });
   const [note, setNote] = useState('');
-  const [created, setCreated] = useState<CreateTokenResponse | null>(null);
+  const [shown, setShown] = useState<(BundleResponse & { fresh: boolean }) | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
   const createMut = useMutation({
     mutationFn: (n: string) =>
-      api<CreateTokenResponse>('/api/tokens', {
+      api<BundleResponse>('/api/tokens', {
         method: 'POST',
         body: JSON.stringify({ note: n }),
       }),
     onSuccess: (data) => {
-      setCreated(data);
+      setShown({ ...data, fresh: true });
       setNote('');
       qc.invalidateQueries({ queryKey: ['tokens'] });
     },
     onError: (e: Error) => setErr(e.message),
   });
 
+  const bundleMut = useMutation({
+    mutationFn: (identity: string) => api<BundleResponse>(`/api/tokens/${identity}/bundle`),
+    onSuccess: (data) => setShown({ ...data, fresh: false }),
+    onError: (e: Error) => setErr(e.message),
+  });
+
   const deleteMut = useMutation({
     mutationFn: (identity: string) => api(`/api/tokens/${identity}`, { method: 'DELETE' }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['tokens'] }),
+    onSuccess: (_, identity) => {
+      qc.invalidateQueries({ queryKey: ['tokens'] });
+      if (shown?.identity === identity) setShown(null);
+    },
   });
 
   return (
@@ -79,21 +88,28 @@ export default function Tokens() {
       </form>
       {err && <div className="mt-2 text-sm text-red-600">{err}</div>}
 
-      {created && (
-        <div className="mt-4 rounded border border-emerald-300 bg-emerald-50 p-4">
+      {shown && (
+        <div
+          className={
+            'mt-4 rounded border p-4 ' +
+            (shown.fresh ? 'border-emerald-300 bg-emerald-50' : 'border-neutral-300 bg-neutral-50')
+          }
+        >
           <div className="flex items-center justify-between">
-            <div className="text-sm font-medium">New token minted</div>
+            <div className="text-sm font-medium">
+              {shown.fresh ? 'New token minted' : shown.note || '(no note)'}
+            </div>
             <button
-              onClick={() => setCreated(null)}
+              onClick={() => setShown(null)}
               className="text-xs text-neutral-600 hover:text-neutral-900"
             >
               Dismiss
             </button>
           </div>
           <div className="mt-3 text-xs font-medium text-neutral-700">Access token</div>
-          <pre className="mt-1 overflow-x-auto rounded bg-white p-2 text-xs">{created.accessToken}</pre>
+          <pre className="mt-1 overflow-x-auto rounded bg-white p-2 text-xs">{shown.accessToken}</pre>
           <button
-            onClick={() => navigator.clipboard.writeText(created.accessToken)}
+            onClick={() => navigator.clipboard.writeText(shown.accessToken)}
             className="mt-1 text-xs text-neutral-600 hover:text-neutral-900"
           >
             Copy token
@@ -102,9 +118,9 @@ export default function Tokens() {
           <div className="mt-3 text-xs font-medium text-neutral-700">
             YAML bundle (apply in your PM workspace)
           </div>
-          <pre className="mt-1 max-h-72 overflow-auto rounded bg-white p-2 text-xs">{created.bundle}</pre>
+          <pre className="mt-1 max-h-72 overflow-auto rounded bg-white p-2 text-xs">{shown.bundle}</pre>
           <button
-            onClick={() => navigator.clipboard.writeText(created.bundle)}
+            onClick={() => navigator.clipboard.writeText(shown.bundle)}
             className="mt-1 text-xs text-neutral-600 hover:text-neutral-900"
           >
             Copy bundle
@@ -124,8 +140,8 @@ export default function Tokens() {
           <table className="w-full border-collapse text-sm">
             <thead>
               <tr className="border-b border-neutral-200 text-left text-neutral-600">
-                <th className="py-2 pr-4 font-medium">Note / Identity</th>
                 <th className="py-2 pr-4 font-medium">Token ID</th>
+                <th className="py-2 pr-4 font-medium">Note</th>
                 <th className="py-2 pr-4 font-medium">Accesses</th>
                 <th className="py-2 pr-4 font-medium">Created</th>
                 <th className="py-2"></th>
@@ -133,20 +149,31 @@ export default function Tokens() {
             </thead>
             <tbody>
               {tokensQ.data.map((t) => (
-                <tr key={t.identity} className="border-b border-neutral-100">
-                  <td className="py-2 pr-4">
-                    <div className="font-medium">{t.note || <span className="text-neutral-500">(no note)</span>}</div>
-                    <div className="text-xs text-neutral-500">{t.identity}</div>
-                  </td>
+                <tr
+                  key={t.identity}
+                  onClick={() => {
+                    setErr(null);
+                    bundleMut.mutate(t.identity);
+                  }}
+                  className={
+                    'cursor-pointer border-b border-neutral-100 hover:bg-neutral-50 ' +
+                    (shown?.identity === t.identity ? 'bg-neutral-50' : '')
+                  }
+                >
                   <td className="py-2 pr-4 font-mono text-xs">{t.tokenID || '—'}</td>
+                  <td className="py-2 pr-4">
+                    {t.note || <span className="text-neutral-500">(no note)</span>}
+                  </td>
                   <td className="py-2 pr-4">{t.accessCount}</td>
                   <td className="py-2 pr-4 text-xs text-neutral-600">
                     {new Date(t.createdAt).toLocaleString()}
                   </td>
                   <td className="py-2 text-right">
                     <button
-                      onClick={() => {
-                        if (confirm(`Revoke token "${t.note || t.identity}"? Existing Accesses keep working until deleted individually.`)) {
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const label = t.note || t.tokenID || t.identity;
+                        if (confirm(`Revoke token "${label}"? Existing Accesses keep working until deleted individually.`)) {
                           deleteMut.mutate(t.identity);
                         }
                       }}
