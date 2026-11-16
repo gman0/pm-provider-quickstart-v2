@@ -1,0 +1,12 @@
+apiVersion: v2
+name: wildwest-portal
+description: Wildwest provider portal — SaaS UI for minting AccessIdentities and viewing Accesses
+type: application
+version: 0.0.1
+appVersion: "0.0.0-dev"
+sources:
+  - https://github.com/platform-mesh/provider-quickstart
+dependencies:
+  - name: common
+    version: 0.16.0
+    repository: oci://ghcr.io/platform-mesh/helm-charts

@@ -46,6 +46,9 @@ IMAGE_NAME ?= provider-quickstart-v2
 IMAGE_TAG ?= dev
 IMAGE ?= $(IMAGE_REGISTRY)/$(IMAGE_NAME):$(IMAGE_TAG)
 
+PORTAL_IMAGE_NAME ?= provider-quickstart-v2-portal
+PORTAL_IMAGE ?= $(IMAGE_REGISTRY)/$(PORTAL_IMAGE_NAME):$(IMAGE_TAG)
+
 CONTAINER_TOOL ?= $(shell command -v docker >/dev/null 2>&1 && echo docker || (command -v podman >/dev/null 2>&1 && echo podman))
 ifeq ($(CONTAINER_TOOL),)
 $(error Neither docker nor podman found in PATH; install one or set CONTAINER_TOOL explicitly)
@@ -61,7 +64,7 @@ all: build
 
 ## build: Build all binaries
 .PHONY: build
-build: build-operator build-bootstrapper
+build: build-operator build-bootstrapper build-portal
 
 ## build-operator: Build the wild-west operator binary
 .PHONY: build-operator
@@ -72,6 +75,19 @@ build-operator: fmt vet
 .PHONY: build-bootstrapper
 build-bootstrapper: fmt vet
 	$(GOBUILD) -o $(BUILD_DIR)/$(BOOTSTRAPPER_BINARY_NAME) ./cmd/bootstrapper/...
+
+## build-portal: Build the portal binary (expects portal SPA already built)
+.PHONY: build-portal
+build-portal: fmt vet
+	$(GOBUILD) -o $(BUILD_DIR)/portal ./cmd/portal/...
+
+## portal-spa-build: Build the portal SPA into pkg/portal/server/dist (runs node in a container)
+.PHONY: portal-spa-build
+portal-spa-build:
+	$(CONTAINER_TOOL) run --rm \
+	  --user $(shell id -u):$(shell id -g) \
+	  -v $(CURDIR):/workspace -w /workspace/portal \
+	  node:20-alpine sh -c 'npm install --no-audit --no-fund && npm run build'
 
 ## run: Run the wild-west operator locally
 .PHONY: run
@@ -123,13 +139,23 @@ image-build:
 image-push: image-build
 	$(CONTAINER_TOOL) push $(IMAGE_PUSH_FLAGS) $(IMAGE)
 
+## portal-image-build: Build portal container image locally
+.PHONY: portal-image-build
+portal-image-build:
+	$(CONTAINER_TOOL) build -t $(PORTAL_IMAGE) -f deploy/portal.Dockerfile .
+
+## portal-image-push: Push portal container image to registry
+.PHONY: portal-image-push
+portal-image-push: portal-image-build
+	$(CONTAINER_TOOL) push $(IMAGE_PUSH_FLAGS) $(PORTAL_IMAGE)
+
 ## images: Build all container images
 .PHONY: images
-images: image-build
+images: image-build portal-image-build
 
 ## images-push: Push all container images
 .PHONY: images-push
-images-push: image-push
+images-push: image-push portal-image-push
 
 # Kind cluster parameters
 KIND_CLUSTER ?= platform-mesh
@@ -149,9 +175,14 @@ endef
 kind-load: image-build
 	$(call kind_load_image,$(IMAGE))
 
+## kind-load-portal: Load portal image into kind cluster
+.PHONY: kind-load-portal
+kind-load-portal: portal-image-build
+	$(call kind_load_image,$(PORTAL_IMAGE))
+
 ## kind-load-all: Load all images into kind cluster
 .PHONY: kind-load-all
-kind-load-all: kind-load
+kind-load-all: kind-load kind-load-portal
 
 ## tools: Install all required tools
 .PHONY: tools
@@ -164,7 +195,7 @@ IMAGE_VERSION ?= $(VERSION)
 # Helm chart publishing parameters
 HELM ?= helm
 HELM_REPO ?= ghcr.io/platform-mesh/provider-quickstart/charts
-HELM_CHARTS ?= wildwest-crds wildwest-controller wildwest-bootstrapper
+HELM_CHARTS ?= wildwest-crds wildwest-controller wildwest-bootstrapper wildwest-portal
 
 ## helm-push: Package and push deployable Helm charts to $(HELM_REPO) as OCI artifacts
 .PHONY: helm-push
